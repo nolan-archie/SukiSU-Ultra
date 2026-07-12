@@ -136,6 +136,28 @@ $(info -- $(REPO_NAME)/compat: modern static_key_interface found)
 ccflags-y += -DKSU_HAS_MODERN_STATIC_KEY_INTERFACE
 endif
 
+ifndef KSU_EXPECTED_SIZE
+KSU_EXPECTED_SIZE := 0x35c
+endif
+
+ifndef KSU_EXPECTED_HASH
+KSU_EXPECTED_HASH := 947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef
+endif
+
+$(info -- KernelSU Manager signature size: $(KSU_EXPECTED_SIZE))
+$(info -- KernelSU Manager signature hash: $(KSU_EXPECTED_HASH))
+
+ccflags-y += -DEXPECTED_SIZE=$(KSU_EXPECTED_SIZE)
+ccflags-y += -DEXPECTED_HASH=\"$(KSU_EXPECTED_HASH)\"
+
+ifdef KSU_EXPECTED_SIZE2
+ifndef KSU_EXPECTED_HASH2
+$(error KSU_EXPECTED_HASH2 must be set when KSU_EXPECTED_SIZE2 is set)
+endif
+ccflags-y += -DEXPECTED_SIZE2=$(KSU_EXPECTED_SIZE2)
+ccflags-y += -DEXPECTED_HASH2=\"$(KSU_EXPECTED_HASH2)\"
+endif
+
 ifdef KSU_MANAGER_PACKAGE
 ccflags-y += -DKSU_MANAGER_PACKAGE=\"$(KSU_MANAGER_PACKAGE)\"
 $(info -- KernelSU Manager package name: $(KSU_MANAGER_PACKAGE))
