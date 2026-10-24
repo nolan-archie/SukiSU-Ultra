@@ -1169,12 +1169,60 @@ where
     false
 }
 
+/// Check process comm, command-line basenames, and executable basenames.
+/// Some Zygisk daemons use execveat, which can leave comm as a synthetic fd name.
+fn is_process_running_matching_paths<F>(predicate: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let file_name = entry.file_name();
+        if !file_name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let proc_path = entry.path();
+
+        if let Ok(comm) = std::fs::read_to_string(proc_path.join("comm")) {
+            if predicate(comm.trim()) {
+                return true;
+            }
+        }
+
+        if let Ok(cmdline) = std::fs::read(proc_path.join("cmdline")) {
+            for arg in cmdline.split(|byte| *byte == 0) {
+                if arg.is_empty() {
+                    continue;
+                }
+                let arg = String::from_utf8_lossy(arg);
+                let basename = arg.rsplit('/').next().unwrap_or_default();
+                if predicate(basename) {
+                    return true;
+                }
+            }
+        }
+
+        if let Ok(exe) = std::fs::read_link(proc_path.join("exe")) {
+            if let Some(basename) = exe.file_name().and_then(|name| name.to_str()) {
+                if predicate(basename) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Determine whether the Zygisk provider's daemon is actually running
 pub fn is_zygisk_daemon_running(module_id: &str) -> bool {
     let id_lower = module_id.to_ascii_lowercase();
     let result = match id_lower.as_str() {
-        "rezygisk" => is_process_running_matching(|name| {
-            name.starts_with("rezygisk") || name.contains("rezygisk")
+        "rezygisk" => is_process_running_matching_paths(|name| {
+            name.starts_with("rezygisk")
+                || name.contains("rezygisk")
+                || name.starts_with("zygiskd")
         }),
         "zygisksu" => is_process_running_matching(|name| {
             name.starts_with("zygiskd")
